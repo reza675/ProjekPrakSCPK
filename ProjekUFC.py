@@ -161,7 +161,7 @@ def perhitunganWP():
             label=f"Bobot {all_criteria[key]}",
             min_value=0.0,
             max_value=5.0,
-            value=1.0,
+            value=2.5,
             step=0.25,
             key=f"slider_{key}"
         )
