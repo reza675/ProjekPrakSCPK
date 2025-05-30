@@ -6,8 +6,8 @@ import plotly.express as px
 import base64
 from streamlit_option_menu import option_menu
 
-st.set_page_config(page_title="UFC dashboard", page_icon="🥊", layout="wide")
-st.title("🏟️ Sistem Pendukung Keputusan Pemilihan Petarung UFC Terbaik ")
+st.set_page_config(page_title="123230013_123230030 Projek", page_icon="🥊", layout="wide")
+
 
 st.markdown("""
 <style>
@@ -50,6 +50,7 @@ Stance=st.sidebar.multiselect(
 df_selection = df[df["stance"].isin(Stance)]
 
 def dashboard():
+    st.title("🏟️ Dashboard Dataset UFC")
     with st.expander("DATASET INFO"):
         showData=st.multiselect('Filter: ',df_selection.columns,default=["name","nickname","wins","losses","draws","height_cm","weight_in_kg","reach_in_cm","stance","date_of_birth","significant_strikes_landed_per_minute","significant_striking_accuracy","significant_strikes_absorbed_per_minute","significant_strike_defence","average_takedowns_landed_per_15_minutes","takedown_accuracy","takedown_defense","average_submissions_attempted_per_15_minutes"])
         st.dataframe(df_selection[showData],use_container_width=True)
@@ -116,12 +117,117 @@ def grafik():
         fig_pie.update_traces(textinfo='percent+label', textposition='inside')
         st.plotly_chart(fig_pie, use_container_width=True)
 
+def perhitunganWP():
+    st.title("📊 Sistem Pendukung Keputusan Pemilihan Petarung UFC Terbaik ")
+
+    # Pilihan kriteria yang tersedia
+    all_criteria = {
+        "wins": "Win",
+        "losses": "Lose",
+        "draws": "Draw",
+        "height_cm": "Height (cm)",
+        "weight_in_kg": "Weight (kg)",
+        "significant_striking_accuracy": "Significant Striking Accuracy (%)"
+    }
+
+    # 1. Pilih kriteria yang akan digunakan
+    selected_keys = st.multiselect(
+        "Pilih kriteria yang digunakan:",
+        options=list(all_criteria.keys()),
+        format_func=lambda x: all_criteria[x],
+        default=["wins", "losses", "significant_striking_accuracy"]
+    )
+
+    if not selected_keys:
+        st.warning("⚠️ Silakan pilih minimal satu kriteria.")
+        return
+
+    # 2. Tentukan tipe: Cost atau Benefit
+    st.markdown("### ⚖️ Tipe Kriteria (Benefit/Cost)")
+    cost_benefit = {}
+    for key in selected_keys:
+        cb = st.selectbox(
+            f"{all_criteria[key]}:",
+            options=["Benefit", "Cost"],
+            key=f"cb_{key}"
+        )
+        cost_benefit[key] = 1 if cb == "Benefit" else -1
+
+    # 3. Slider bobot dengan interval 0.25
+    st.markdown("### 🎚️ Bobot Kriteria (0.0 - 5.0)")
+    bobot = {}
+    for key in selected_keys:
+        bobot[key] = st.slider(
+            label=f"Bobot {all_criteria[key]}",
+            min_value=0.0,
+            max_value=5.0,
+            value=1.0,
+            step=0.25,
+            key=f"slider_{key}"
+        )
+
+    # 4. Normalisasi bobot
+    total_bobot = sum(bobot.values())
+    if total_bobot == 0:
+        st.warning("⚠️ Total bobot tidak boleh nol.")
+        return
+
+    bobot_norm = {k: v / total_bobot for k, v in bobot.items()}
+    st.info("Bobot Ter-normalisasi:\n" +
+            ", ".join([f"{all_criteria[k]}: {bobot_norm[k]:.3f}" for k in selected_keys]))
+
+    # 5. Persiapan data
+    X = df_selection[selected_keys].copy()
+    X[selected_keys] = X[selected_keys].fillna(0)
+    if "stance" in selected_keys:
+        X["stance"] = X["stance"].astype('category').cat.codes  # Label encode stance
+
+    # 6. Hitung WP: S dan V
+    S = []
+    for i, row in X.iterrows():
+        product = 1.0
+        for key in selected_keys:
+            val = row[key]
+            exp = cost_benefit[key] * bobot_norm[key]
+            product *= (val + 1e-9) ** exp
+        S.append(product)
+
+    total_S = sum(S)
+    V = [s / total_S for s in S]
+
+    # 7. Tampilkan hasil
+    hasil = pd.DataFrame({
+        "name": df_selection["name"],
+        **{all_criteria[k]: df_selection[k] if k != "stance" else df_selection["stance"] for k in selected_keys},
+        "Skor_WP": V
+    }).sort_values("Skor_WP", ascending=False).reset_index(drop=True)
+
+    st.markdown("### 🏅 Hasil Ranking Petarung UFC (Metode WP)")
+    st.dataframe(hasil.head(10), use_container_width=True)
+    
+    top10 = hasil.head(10)
+
+    # Plot bar chart
+    st.markdown("### 📊 Skor WP 10 Petarung Teratas")
+    fig_wp = px.bar(
+        top10,
+        x='Skor_WP',
+        y='name',
+        orientation='h',
+        template='plotly_dark',
+        title='Skor WP 10 Teratas',
+        text_auto=True
+    )
+    fig_wp.update_layout(yaxis={'categoryorder':'total ascending'})
+    st.plotly_chart(fig_wp, use_container_width=True)
+
+    
 #menu sidebar
 def sideBar():
  with st.sidebar:
     selected=option_menu(
         menu_title="Menu Program",
-        options=["dashboard","perhitunganWP"],
+        options=["dashboard","perhitungan WP"],
         icons=["house","graph-up-arrow"],
         menu_icon="cast",
         default_index=0
@@ -129,8 +235,8 @@ def sideBar():
  if selected=="dashboard":
     dashboard()
     grafik()
- if selected=="perhitunganWP":
-    # perhitunganWP()
-    grafik()
+ if selected=="perhitungan WP":
+    perhitunganWP()
+
 
 sideBar()
