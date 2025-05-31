@@ -1,7 +1,5 @@
 import pandas as pd
-import numpy as np
 import streamlit as st
-import matplotlib.pyplot as plt
 import plotly.express as px
 import base64
 from streamlit_option_menu import option_menu
@@ -87,8 +85,9 @@ def grafik():
     
     with col1:
         st.markdown("#### Distribusi Petarung berdasarkan Kuda-Kuda")
-        stance_count = df_selection['stance'].value_counts().reset_index()
+        stance_count = df_selection['stance'].value_counts(dropna=False).reset_index()
         stance_count.columns = ['Stance', 'Jumlah']
+        stance_count['Stance'] = stance_count['Stance'].fillna("Tidak diketahui")
         fig_stance = px.bar(stance_count, x='Stance', y='Jumlah', color='Stance',
                             template='plotly_dark', text_auto=True)
         st.plotly_chart(fig_stance, use_container_width=True)
@@ -104,7 +103,10 @@ def grafik():
     col3, col4 = st.columns(2)
     with col3:
         st.markdown("#### Rata-rata Jumlah Kemenangan per Stance")
-        win_avg = df_selection.groupby("stance")["wins"].mean().reset_index()
+        #ngisi yang tidak diketahui kuda2 ne
+        df_temp = df_selection.copy()
+        df_temp['stance'] = df_temp['stance'].fillna("Tidak diketahui")
+        win_avg = df_temp.groupby("stance")["wins"].mean().reset_index()
         fig_line = px.line(win_avg, x="stance", y="wins", markers=True,
                         title="Rerata Kemenangan per Stance", template="plotly_dark")
         st.plotly_chart(fig_line, use_container_width=True)
@@ -120,7 +122,7 @@ def grafik():
 def perhitunganWP():
     st.title("📊 Sistem Pendukung Keputusan Pemilihan Petarung UFC Terbaik ")
 
-    # Pilihan kriteria yang tersedia
+    # Pilihan kriteria lur
     all_criteria = {
         "wins": "Win",
         "losses": "Lose",
@@ -130,7 +132,7 @@ def perhitunganWP():
         "significant_striking_accuracy": "Significant Striking Accuracy (%)"
     }
 
-    # 1. Pilih kriteria yang akan digunakan
+    # user milih kriteria
     selected_keys = st.multiselect(
         "Pilih kriteria yang digunakan:",
         options=list(all_criteria.keys()),
@@ -142,7 +144,7 @@ def perhitunganWP():
         st.warning("⚠️ Silakan pilih minimal satu kriteria.")
         return
 
-    # 2. Tentukan tipe: Cost atau Benefit
+    # user nentuin mau cost atau benefit
     st.markdown("### ⚖️ Tipe Kriteria (Benefit/Cost)")
     cost_benefit = {}
     for key in selected_keys:
@@ -153,7 +155,6 @@ def perhitunganWP():
         )
         cost_benefit[key] = 1 if cb == "Benefit" else -1
 
-    # 3. Slider bobot dengan interval 0.25
     st.markdown("### 🎚️ Bobot Kriteria (0.0 - 5.0)")
     bobot = {}
     for key in selected_keys:
@@ -166,7 +167,7 @@ def perhitunganWP():
             key=f"slider_{key}"
         )
 
-    # 4. Normalisasi bobot
+    # normalisasi bobot
     total_bobot = sum(bobot.values())
     if total_bobot == 0:
         st.warning("⚠️ Total bobot tidak boleh nol.")
@@ -176,13 +177,12 @@ def perhitunganWP():
     st.info("Bobot Ter-normalisasi:\n" +
             ", ".join([f"{all_criteria[k]}: {bobot_norm[k]:.3f}" for k in selected_keys]))
 
-    # 5. Persiapan data
     X = df_selection[selected_keys].copy()
     X[selected_keys] = X[selected_keys].fillna(0)
     if "stance" in selected_keys:
-        X["stance"] = X["stance"].astype('category').cat.codes  # Label encode stance
+        X["stance"] = X["stance"].astype('category').cat.codes 
 
-    # 6. Hitung WP: S dan V
+    # ngitung vektor s dan v
     S = []
     for i, row in X.iterrows():
         product = 1.0
@@ -195,7 +195,7 @@ def perhitunganWP():
     total_S = sum(S)
     V = [s / total_S for s in S]
 
-    # 7. Tampilkan hasil
+    # nampilin tabel
     hasil = pd.DataFrame({
         "name": df_selection["name"],
         **{all_criteria[k]: df_selection[k] if k != "stance" else df_selection["stance"] for k in selected_keys},
@@ -210,10 +210,8 @@ def perhitunganWP():
     st.header('🏆 Kesimpulan')
     st.success(f"✅ Rekomendasi utama adalah: **{pilihan_terbaik}** dengan skor **{skor_terbaik}**.")
 
-    
     top10 = hasil.head(10)
 
-    # Plot bar chart
     st.markdown("### 📊 Skor WP 10 Petarung Teratas")
     fig_wp = px.bar(
         top10,
