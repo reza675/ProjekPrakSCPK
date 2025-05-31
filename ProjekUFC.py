@@ -46,6 +46,8 @@ Stance=st.sidebar.multiselect(
 )
 # ngefilter stance (kuda kuda)
 df_selection = df[df["stance"].isin(Stance)]
+if (df_selection.empty):
+    st.warning("Tidak ada data yang cocok dengan kriteria yang Anda pilih.")
 
 def dashboard():
     st.title("🏟️ Dashboard Dataset UFC")
@@ -220,7 +222,9 @@ def perhitunganWP():
 
     st.markdown("### 🏅 Hasil Ranking Petarung UFC (Metode WP)")
     hasil['Skor_WP'] = hasil['Skor_WP'].map('{:.11f}'.format)
-    st.dataframe(hasil.head(10), use_container_width=True)
+    hasil_display = hasil.head(10).copy()
+    hasil_display.index = hasil_display.index + 1
+    st.dataframe(hasil_display, use_container_width=True)
     pilihan_terbaik = hasil.iloc[0]['name']
     skor_terbaik = hasil.iloc[0]['Skor_WP']
     st.header('🏆 Kesimpulan')
