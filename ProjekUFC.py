@@ -203,7 +203,13 @@ def perhitunganWP():
     }).sort_values("Skor_WP", ascending=False).reset_index(drop=True)
 
     st.markdown("### 🏅 Hasil Ranking Petarung UFC (Metode WP)")
+    hasil['Skor_WP'] = hasil['Skor_WP'].map('{:.11f}'.format)
     st.dataframe(hasil.head(10), use_container_width=True)
+    pilihan_terbaik = hasil.iloc[0]['name']
+    skor_terbaik = hasil.iloc[0]['Skor_WP']
+    st.header('🏆 Kesimpulan')
+    st.success(f"✅ Rekomendasi utama adalah: **{pilihan_terbaik}** dengan skor **{skor_terbaik}**.")
+
     
     top10 = hasil.head(10)
 
