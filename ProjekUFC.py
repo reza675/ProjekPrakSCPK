@@ -96,6 +96,7 @@ def grafik():
         st.markdown("#### Histogram Akurasi Serangan")
         fig_accuracy = px.histogram(df_selection, x='significant_striking_accuracy',
                                     nbins=20, template='plotly_dark', color_discrete_sequence=['#00cc96'])
+        fig_accuracy.update_layout(xaxis_title='Akurasi Serangan', yaxis_title='Jumlah')   
         st.plotly_chart(fig_accuracy, use_container_width=True)
 
     st.markdown("---")
@@ -107,17 +108,32 @@ def grafik():
         df_temp = df_selection.copy()
         df_temp['stance'] = df_temp['stance'].fillna("Tidak diketahui")
         win_avg = df_temp.groupby("stance")["wins"].mean().reset_index()
-        fig_line = px.line(win_avg, x="stance", y="wins", markers=True,
-                        title="Rerata Kemenangan per Stance", template="plotly_dark")
+        fig_line = px.line(win_avg, x="stance", y="wins", markers=True,template="plotly_dark",labels={"stance":"Stance","wins":"Kemenangan"})
         st.plotly_chart(fig_line, use_container_width=True)
 
     with col4:
-        st.markdown("#### Pie Chart Akurasi Takedown")
-        df_pie = df_selection[['name', 'takedown_accuracy']].sort_values(by='takedown_accuracy', ascending=False).head(10)
-        fig_pie = px.pie(df_pie, names='name', values='takedown_accuracy', title='Top 10 Akurasi Takedown',
-                         template='plotly_dark')
-        fig_pie.update_traces(textinfo='percent+label', textposition='inside')
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.markdown("#### Top 10 Petarung Tertinggi (cm)")
+
+        df_top_height = df_selection[['name', 'height_cm']].dropna()
+        df_top_height = df_top_height.sort_values(by='height_cm', ascending=False).head(10)
+
+        fig_bar = px.bar(
+            df_top_height,
+            x='height_cm',
+            y='name',
+            orientation='h',
+            color='height_cm',
+            template='plotly_dark',
+            color_continuous_scale='viridis',
+            labels={
+                'name': 'Nama',
+                'height_cm': 'Tinggi (cm)'
+            },
+            text='height_cm'
+        )
+        fig_bar.update_layout(yaxis=dict(autorange="reversed")) #biar urutan dari atas ke bawah
+        st.plotly_chart(fig_bar, use_container_width=True)
+
 
 def perhitunganWP():
     st.title("📊 Sistem Pendukung Keputusan Pemilihan Petarung UFC Terbaik ")
