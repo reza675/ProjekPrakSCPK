@@ -37,8 +37,6 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-
-
 Stance=st.sidebar.multiselect(
     "PILIH KUDA-KUDA",
      options=df["stance"].unique(),
@@ -46,11 +44,12 @@ Stance=st.sidebar.multiselect(
 )
 # ngefilter stance (kuda kuda)
 df_selection = df[df["stance"].isin(Stance)]
-if (df_selection.empty):
-    st.warning("Tidak ada data yang cocok dengan kriteria yang Anda pilih.")
 
 def dashboard():
     st.title("🏟️ Dashboard Dataset UFC")
+    if df_selection.empty:
+        st.warning("⚠️ Tidak ada data yang cocok dengan kriteria yang Anda pilih.")
+        return
     with st.expander("DATASET INFO"):
         showData=st.multiselect('Filter: ',df_selection.columns,default=["name","nickname","wins","losses","draws","height_cm","weight_in_kg","reach_in_cm","stance","date_of_birth","significant_strikes_landed_per_minute","significant_striking_accuracy","significant_strikes_absorbed_per_minute","significant_strike_defence","average_takedowns_landed_per_15_minutes","takedown_accuracy","takedown_defense","average_submissions_attempted_per_15_minutes"])
         st.dataframe(df_selection[showData],use_container_width=True)
@@ -119,27 +118,16 @@ def grafik():
         df_top_height = df_selection[['name', 'height_cm']].dropna()
         df_top_height = df_top_height.sort_values(by='height_cm', ascending=False).head(10)
 
-        fig_bar = px.bar(
-            df_top_height,
-            x='height_cm',
-            y='name',
-            orientation='h',
-            color='height_cm',
-            template='plotly_dark',
-            color_continuous_scale='viridis',
-            labels={
-                'name': 'Nama',
-                'height_cm': 'Tinggi (cm)'
-            },
-            text='height_cm'
-        )
+        fig_bar = px.bar(df_top_height,x='height_cm',y='name',orientation='h',color='height_cm',template='plotly_dark',color_continuous_scale='viridis',labels={    'name': 'Nama',    'height_cm': 'Tinggi (cm)'},text='height_cm')
         fig_bar.update_layout(yaxis=dict(autorange="reversed")) #biar urutan dari atas ke bawah
         st.plotly_chart(fig_bar, use_container_width=True)
 
-
 def perhitunganWP():
     st.title("📊 Sistem Pendukung Keputusan Pemilihan Petarung UFC Terbaik ")
-
+    if df_selection.empty:
+        st.error("❌ Tidak ada petarung untuk dihitung karena belum memilih Kuda-Kuda (stance) di sidebar.")
+        return
+    
     # Pilihan kriteria lur
     all_criteria = {
         "wins": "Win",
@@ -155,7 +143,7 @@ def perhitunganWP():
         "Pilih kriteria yang digunakan:",
         options=list(all_criteria.keys()),
         format_func=lambda x: all_criteria[x],
-        default=["wins", "losses", "significant_striking_accuracy"]
+        default=["wins", "losses", "draws", "height_cm", "weight_in_kg"]
     )
 
     if not selected_keys:
@@ -192,13 +180,18 @@ def perhitunganWP():
         return
 
     bobot_norm = {k: v / total_bobot for k, v in bobot.items()}
-    st.info("Bobot Ter-normalisasi:\n" +
-            ", ".join([f"{all_criteria[k]}: {bobot_norm[k]:.3f}" for k in selected_keys]))
+    tabel_normalisasi = pd.DataFrame({
+        "Kriteria": [k for k in selected_keys],
+        "Bobot Awal": [bobot[k] for k in selected_keys],
+        "Tipe": ["Benefit" if cost_benefit[k] == 1 else "Cost" for k in selected_keys],
+        "Bobot Ternormalisasi": [bobot_norm[k] * (1 if cost_benefit[k] == 1 else -1) for k in selected_keys]
+    })
+
+    st.markdown("### 📌 Normalisasi Bobot Kriteria")
+    st.dataframe(tabel_normalisasi, use_container_width=True)
 
     X = df_selection[selected_keys].copy()
     X[selected_keys] = X[selected_keys].fillna(0)
-    if "stance" in selected_keys:
-        X["stance"] = X["stance"].astype('category').cat.codes 
 
     # ngitung vektor s dan v
     S = []
@@ -217,6 +210,7 @@ def perhitunganWP():
     hasil = pd.DataFrame({
         "name": df_selection["name"],
         **{all_criteria[k]: df_selection[k] if k != "stance" else df_selection["stance"] for k in selected_keys},
+        "Vektor S": S,
         "Skor_WP": V
     }).sort_values("Skor_WP", ascending=False).reset_index(drop=True)
 
@@ -230,21 +224,22 @@ def perhitunganWP():
     st.header('🏆 Kesimpulan')
     st.success(f"✅ Rekomendasi utama adalah: **{pilihan_terbaik}** dengan skor **{skor_terbaik}**.")
 
-    top10 = hasil.head(10)
-
-    st.markdown("### 📊 Skor WP 10 Petarung Teratas")
+    # diurutin manual secara descending
+    top10 = hasil.sort_values('Skor_WP', ascending=False).head(10)
+    # trs ini ngereverse biar skor tertinggi paling atas
+    top10 = top10[::-1]
     fig_wp = px.bar(
         top10,
         x='Skor_WP',
         y='name',
         orientation='h',
         template='plotly_dark',
-        title='Skor WP 10 Teratas',
-        text_auto=True
+        text_auto=True,  
+        labels={'name': 'Petarung UFC', 'Skor_WP': 'Skor WP'}
     )
-    fig_wp.update_layout(yaxis={'categoryorder':'total ascending'})
-    st.plotly_chart(fig_wp, use_container_width=True)
 
+    st.markdown("### 📊 Skor WP 10 Petarung Teratas")
+    st.plotly_chart(fig_wp, use_container_width=True)
     
 #menu sidebar
 def sideBar():
